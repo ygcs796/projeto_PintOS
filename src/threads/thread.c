@@ -25,6 +25,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* Lista dos processos que estão bloqueados */
+static struct list blocked_list;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -92,6 +95,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&blocked_list); //Inicialização da lista de threads bloqueadas
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -295,6 +299,42 @@ thread_exit (void)
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
+}
+
+void
+thread_sleep (int64_t timeToWakeUp) 
+{
+  struct thread *cur = thread_current (); // Ponteiro para a thread atual
+  enum intr_level old_level;
+  
+  old_level = intr_disable ();                  // Desabilita a interrupção para poder atualizar as listas
+  if (cur != idle_thread) {  
+    list_push_back (&blocked_list, &cur->elem); // Colocar na lista de bloqueado (blocked)
+    cur->status = THREAD_BLOCKED;               // Muda o estado da thread para bloqueado
+    cur->wakeup_tick = timeToWakeUp;            // Momento em que a thread deve acordar
+    schedule ();
+  }
+    intr_set_level (old_level);
+}
+
+void
+thread_wakeup (int64_t GlobalTick) 
+{
+  struct list_elem *aux = list_begin(&blocked_list);
+  enum intr_level old_level;
+  
+  old_level = intr_disable (); // Desabilita a interrupção para poder atualizar as listas
+  while (aux != list_end(&blocked_list)) { 
+    struct thread *cur = list_entry(aux, struct thread, elem);
+    if (cur->wakeup_tick <= GlobalTick) {
+      aux = list_remove (aux);
+      list_push_back (&ready_list, &cur->elem); // Colocar no final da lista de prontas (ready)
+      cur->status = THREAD_READY;               // Muda o estado da thread para pronta
+    }
+    else
+      aux = list_next(aux); //Vai para o próximo elemento
+  }
+    intr_set_level (old_level); // Reabilita Interrupção
 }
 
 /* Yields the CPU.  The current thread is not put to sleep and
