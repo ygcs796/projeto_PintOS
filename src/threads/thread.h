@@ -125,6 +125,9 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_wakeup (int64_t GlobalTick);
+bool thread_priority_less (const struct list_elem *a,
+                      const struct list_elem *b,
+                      void *aux UNUSED);
 void thread_sleep (int64_t timeToWakeUp);
 void thread_yield (void);
 
