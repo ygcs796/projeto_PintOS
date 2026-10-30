@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/fixedPoint.h" // MLFQ
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -89,7 +90,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-
+    int64_t wakeup_tick;                /* Tick absoluto em que a thread acorda*/
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -97,6 +98,10 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+
+    //Variaveis para MLFQ:
+    int nice; // o valor de cortesia(-20 ate 20)
+    fixed_point_t recent_cpu; // o uso recente da cpu(em ponto fixo)
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
@@ -106,6 +111,8 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+
+extern struct thread *idle_thread; // deixou de ser static para atuar em time.c
 
 void thread_init (void);
 void thread_start (void);
@@ -124,6 +131,11 @@ tid_t thread_tid (void);
 const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
+void thread_wakeup (int64_t GlobalTick);
+bool thread_priority_less (const struct list_elem *a,
+                      const struct list_elem *b,
+                      void *aux UNUSED);
+void thread_sleep (int64_t timeToWakeUp);
 void thread_yield (void);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
@@ -137,5 +149,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+
 
 #endif /* threads/thread.h */

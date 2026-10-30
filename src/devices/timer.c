@@ -92,8 +92,12 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  
+  /* while (timer_elapsed (start) < ticks) 
+    thread_yield (); */
+  
+  if (timer_elapsed (start) < ticks)
+    thread_sleep(start + ticks); 
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -165,13 +169,39 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  thread_wakeup(ticks);
+  
+   if (thread_mlfqs) // o identificador do escalonador, só roda em true
+    {
+        struct thread *curr = thread_current ();
+
+        // a cada tick incrementa o recent_cpu da thread atual caso ela n seja idle
+        if (curr != idle_thread)
+        {
+            curr->recent_cpu = fp_add_int (curr->recent_cpu, 1);
+        }
+
+        // a cada 100 ticks o load_avg e o recent_cpu de todas as threads sao recalculados 
+        if (ticks % TIMER_FREQ == 0)
+        {
+            thread_calculate_load_avg ();
+            thread_update_all_recent_cpu ();
+        }
+	
+	/*Esse calculo da priorida vem imediatamente depois do recalculo do load_avg e do recent_cpu porque a cada 100 ticks ambos sao executados, entao o calculo da prioridade e calculado ja com os valores mais recentes*/
+        // a cada 4 ticks a prioridade de todas as threads são recalculadas
+        if (ticks % 4 == 0)
+        {
+            thread_update_all_priorities ();
+        }
+    }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
