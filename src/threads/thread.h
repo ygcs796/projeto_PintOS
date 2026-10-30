@@ -111,6 +111,7 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+extern struct list ready_list;
 
 extern struct thread *idle_thread; // deixou de ser static para atuar em time.c
 
@@ -149,6 +150,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+bool thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 
 

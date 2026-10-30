@@ -24,7 +24,7 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+struct list ready_list; // retirada do tipo static
 
 /* Lista dos processos que estão bloqueados */
 static struct list blocked_list;
@@ -65,7 +65,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
-bool thread_mlfqs = true;
+bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -248,7 +248,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, thread_priority_cmp, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -366,7 +366,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, thread_priority_cmp, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -417,8 +417,13 @@ thread_set_nice (int nice)
  // recalcula a prioridade da thread com o nice atual
  thread_calculate_priority (curr);
     
- // se a thread perdeu a maior prioridade, cede pra cpu
- thread_yield ();
+ // reordena a lista e ve se precisa ceder
+  if (!list_empty (&ready_list))
+  {
+    struct thread *top = list_entry (list_begin (&ready_list), struct thread, elem);
+    if (top->priority > curr->priority)
+      thread_yield ();
+  }
 }
 
 /* Returns the current thread's nice value. */
@@ -698,6 +703,18 @@ void thread_update_all_priorities (void)
         struct thread *t = list_entry (e, struct thread, allelem);
         thread_calculate_priority (t);
     }
+    
+    if (!list_empty (&ready_list)) // reordena a ready list com as novas priridades
+       list_sort (&ready_list, thread_priority_cmp, NULL);
+}
+
+// Comparador para ordenar a ready_list da maior pra menor prioridade
+bool
+thread_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *ta = list_entry (a, struct thread, elem);
+  struct thread *tb = list_entry (b, struct thread, elem);
+  return ta->priority > tb->priority;
 }
 
 /* Schedules a new process.  At entry, interrupts must be off and

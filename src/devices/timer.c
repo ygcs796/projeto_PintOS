@@ -200,6 +200,14 @@ timer_interrupt (struct intr_frame *args UNUSED)
         if (ticks % 4 == 0)
         {
             thread_update_all_priorities ();
+            
+		    // se a thread da fila tiver prioridade maior que a atual cede a CPU na saída da interrupção
+	    if (!list_empty (&ready_list))
+	    {
+	      struct thread *top = list_entry (list_begin (&ready_list), struct thread, elem);
+	      if (top->priority > curr->priority)
+		intr_yield_on_return ();
+	    }
         }
     }
 }

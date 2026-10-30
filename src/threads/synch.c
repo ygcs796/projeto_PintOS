@@ -109,14 +109,32 @@ void
 sema_up (struct semaphore *sema) 
 {
   enum intr_level old_level;
+  struct thread *unblocked_thread = NULL;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+    {
+      // busca o elemento com MAIOR prioridade na fila do semáforo 
+      struct list_elem *e = list_max (&sema->waiters, thread_priority_cmp, NULL);
+      list_remove (e);
+      
+      // guarda a referência da thread desbloqueada 
+      unblocked_thread = list_entry (e, struct thread, elem);
+      thread_unblock (unblocked_thread);
+    }
   sema->value++;
+
+  // Se a thread acordada tiver prioridade maior que a atual cede a CPU(peempcao)
+  if (unblocked_thread != NULL && unblocked_thread->priority > thread_current ()->priority)
+    {
+      if (intr_context ())
+        intr_yield_on_return ();
+      else
+        thread_yield ();
+    }
+
   intr_set_level (old_level);
 }
 
