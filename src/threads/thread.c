@@ -318,6 +318,17 @@ struct thread *thread_b = list_entry(b, struct thread, elem);
 return (thread_a->priority > thread_b->priority);
 }
 
+bool 
+thread_tick_less (const struct list_elem *a,
+                  const struct list_elem *b,
+                  void *aux UNUSED) {
+
+struct thread *thread_a = list_entry(a, struct thread, elem);
+struct thread *thread_b = list_entry(b, struct thread, elem);
+
+return (thread_a->wakeup_tick < thread_b->wakeup_tick);
+}
+
 void
 thread_sleep (int64_t timeToWakeUp) 
 {
@@ -327,7 +338,7 @@ thread_sleep (int64_t timeToWakeUp)
   old_level = intr_disable ();                  // Desabilita a interrupção para poder atualizar as listas
   if (cur != idle_thread) {  
     cur->wakeup_tick = timeToWakeUp;            // Momento em que a thread deve acordar
-    list_insert_ordered (&blocked_list, &cur->elem, &thread_priority_less, NULL); // Colocar na lista de bloqueado (blocked)
+    list_insert_ordered (&blocked_list, &cur->elem, &thread_tick_less, NULL); // Colocar na lista de bloqueado (blocked)
     thread_block();               // Muda o estado da thread para bloqueado'
   }
     intr_set_level (old_level);
@@ -349,7 +360,7 @@ thread_wakeup (int64_t GlobalTick)
       list_insert_ordered (&ready_list, &cur->elem, &thread_priority_less, NULL);              // Muda o estado da thread para pronta
     }
     else
-      aux = list_next(aux);
+      break;
   }
   intr_set_level (old_level);
 }
